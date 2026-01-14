@@ -20,10 +20,7 @@ import (
 )
 
 func main() {
-	// 加载配置文件
-	// 优先级：CONFIG_PATH > APP_ENV > config.yaml
-	// CONFIG_PATH: 直接指定配置文件路径
-	// APP_ENV: 根据环境自动选择 (dev/test/prod)
+	// 加载配置文件（可通过环境变量指定配置文件路径）
 	configPath := os.Getenv("CONFIG_PATH")
 	if err := config.LoadConfig(configPath); err != nil {
 		log.Fatalf("Failed to load config: %v", err)

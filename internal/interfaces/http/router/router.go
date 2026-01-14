@@ -25,12 +25,26 @@ func SetupRouter() *gin.Engine {
 	})
 
 	// 依赖注入
+	// 用户相关
 	userRepo := repository.NewUserRepository(database.DB)
 	createUserUseCase := usecase.NewCreateUserUseCase(userRepo)
 	getUserUseCase := usecase.NewGetUserUseCase(userRepo)
 	listUsersUseCase := usecase.NewListUsersUseCase(userRepo)
 	loginUseCase := usecase.NewLoginUseCase(userRepo)
 
+	// 项目相关
+	projectRepo := repository.NewProjectsRepository(database.DB)
+	createProjectUseCase := usecase.NewCreateProjectsCase(projectRepo)
+	updateProjectUseCase := usecase.NewUpdateProjectsCase(projectRepo)
+	deleteProjectUseCase := usecase.NewDeleteProjectsCase(projectRepo)
+	getProjectUseCase := usecase.NewGetProjectsCase(projectRepo)
+	listProjectsUseCase := usecase.NewListProjectsCase(projectRepo)
+
+	// 团队相关
+	teamRepo := repository.NewTeamRepository(database.DB)
+	projectsTeamUseCase := usecase.NewProjectsTeamUseCase(teamRepo)
+
+	projectHandler := handler.NewProjectsHandler(createProjectUseCase, updateProjectUseCase, getProjectUseCase, listProjectsUseCase, deleteProjectUseCase, projectsTeamUseCase)
 	userHandler := handler.NewUserHandler(createUserUseCase, getUserUseCase, listUsersUseCase)
 	authHandler := handler.NewAuthHandler(loginUseCase)
 
@@ -41,6 +55,18 @@ func SetupRouter() *gin.Engine {
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
+		}
+
+		// 项目相关路由
+		projects := v1.Group("/projects")
+		projects.Use(middleware.Auth())
+		{
+			projects.GET("", projectHandler.ListProjects)
+			projects.POST("", projectHandler.CreateProject)
+			projects.GET("/:id", projectHandler.GetProject)
+			projects.PUT("/:id", projectHandler.UpdateProject)
+			projects.DELETE("/:id", projectHandler.DeleteProject)
+			projects.GET("/teams/available", projectHandler.ProjectTeams)
 		}
 
 		// 用户相关路由
