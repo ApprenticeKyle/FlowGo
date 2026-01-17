@@ -12,9 +12,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"FLOWGO/internal/application/service"
 	"FLOWGO/internal/infrastructure/config"
 	"FLOWGO/internal/infrastructure/database"
 	"FLOWGO/internal/infrastructure/redis"
+	"FLOWGO/internal/infrastructure/repository"
+	"FLOWGO/internal/interfaces/http/handler"
 	"FLOWGO/internal/interfaces/http/router"
 	"FLOWGO/pkg/jwt"
 )
@@ -63,8 +66,23 @@ func main() {
 		gin.SetMode(ginMode)
 	}
 
+	// 依赖注入
+	// 基础设施
+	userRepo := repository.NewUserRepository(database.DB)
+	projectRepo := repository.NewProjectsRepository(database.DB)
+
+	// 应用服务
+	userService := service.NewUserService(userRepo)
+	authService := service.NewAuthService(userRepo)
+	projectService := service.NewProjectService(projectRepo)
+
+	// 控制器
+	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
+	projectHandler := handler.NewProjectsHandler(projectService)
+
 	// 设置路由
-	r := router.SetupRouter()
+	r := router.SetupRouter(authHandler, userHandler, projectHandler)
 
 	// 启动服务器
 	port := config.AppConfig.Server.Port
