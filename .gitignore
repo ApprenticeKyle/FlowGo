@@ -97,3 +97,9 @@ tmp/
 # Test files
 testdata/
 *.test.json
+
+# MD files
+*.md
+
+#HTTP requests
+*.http
