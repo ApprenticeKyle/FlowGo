@@ -173,14 +173,14 @@ func (s *DevOpsService) HandleWebhook(ctx context.Context, payload dto.WebhookPa
 
 // TriggerDeployment 触发部署
 func (s *DevOpsService) TriggerDeployment(ctx context.Context, deployType string) error {
-	scriptName := "scripts/deploy_backend.sh" // Default
+	scriptName := "/home/deploy_backend.sh" // Default
 	commitMsg := "Manual Deployment Trigger"
 
 	if deployType == "frontend" {
-		scriptName = "scripts/deploy_frontend.sh"
+		scriptName = "/home/deploy_frontend.sh"
 		commitMsg = "Frontend Deployment"
 	} else if deployType == "backend" {
-		scriptName = "scripts/deploy_backend.sh"
+		scriptName = "/home/deploy_backend.sh"
 		commitMsg = "Backend Deployment"
 	}
 
