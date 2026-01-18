@@ -1,0 +1,17 @@
+server:
+  port: 8080
+  mode: debug
+
+database:
+  driver: mysql
+  dsn: "root:password@tcp(127.0.0.1:3306)/flowgo?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+jwt:
+  secret: "your-secret-key-change-me"
+  expire_duration: 24h
+
+log:
+  level: debug
+  filename: "app.log"
