@@ -4,21 +4,25 @@ import (
 	"FLOWGO/internal/application/dto"
 	"FLOWGO/internal/domain/entity/devops"
 	"FLOWGO/internal/domain/repository"
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"os/exec"
 	"time"
 )
 
 type DevOpsService struct {
-	devopsRepo repository.DevOpsRepository
+	devopsRepo  repository.DevOpsRepository
+	Broadcaster *LogBroadcaster
 }
 
 func NewDevOpsService(devopsRepo repository.DevOpsRepository) *DevOpsService {
 	return &DevOpsService{
-		devopsRepo: devopsRepo,
+		devopsRepo:  devopsRepo,
+		Broadcaster: NewLogBroadcaster(),
 	}
 }
 
@@ -206,40 +210,92 @@ func (s *DevOpsService) TriggerDeployment(ctx context.Context, repoConfigID uint
 		return err
 	}
 
-	// 2. 异步执行脚本
+	// Notify start status
+	s.Broadcaster.SendStatus(record.ID, "running")
+
+	// 2. 异步执行脚本并流式输出日志
 	go func(recordID uint64, script string) {
 		bgCtx := context.Background()
 
 		// Execute shell script
-		// Use bash explicitely
 		cmd := exec.Command("bash", script)
 
-		output, err := cmd.CombinedOutput()
+		// Create pipes for stdout and stderr
+		stdoutPipe, _ := cmd.StdoutPipe()
+		stderrPipe, _ := cmd.StderrPipe()
 
-		endTime := time.Now()
-		duration := int64(time.Since(*record.StartedAt).Seconds())
+		if err := cmd.Start(); err != nil {
+			s.updateRecordStatus(bgCtx, recordID, devops.PipelineStatusFailed, "Start Failed: "+err.Error(), record.StartedAt)
+			s.Broadcaster.SendStatus(recordID, "failed")
+			return
+		}
+
+		// Read output in goroutine
+		outputChan := make(chan string)
+		done := make(chan bool)
+
+		go func() {
+			reader := io.MultiReader(stdoutPipe, stderrPipe)
+			scanner := bufio.NewScanner(reader)
+			for scanner.Scan() {
+				line := scanner.Text()
+				outputChan <- line
+			}
+			done <- true
+		}()
+
+		var fullOutput string
+
+		// Collect output and broadcast
+	loop:
+		for {
+			select {
+			case line := <-outputChan:
+				s.Broadcaster.SendLog(recordID, line+"\n")
+				fullOutput += line + "\n"
+			case <-done:
+				break loop
+			}
+		}
+
+		err := cmd.Wait()
 
 		status := devops.PipelineStatusSuccess
 		if err != nil {
 			status = devops.PipelineStatusFailed
+			fullOutput += "\nProcess exited with error: " + err.Error()
 		}
 
-		updateObj := &devops.PipelineRecord{
-			ID:         recordID,
-			Status:     status,
-			Duration:   duration,
-			FinishedAt: &endTime,
-			CommitMsg:  "Output: " + string(output),
-		}
-		if len(updateObj.CommitMsg) > 500 {
-			updateObj.CommitMsg = updateObj.CommitMsg[:500] + "..."
-		}
-
-		_ = s.devopsRepo.SavePipelineRecord(bgCtx, updateObj)
+		s.updateRecordStatus(bgCtx, recordID, status, fullOutput, record.StartedAt)
+		s.Broadcaster.SendStatus(recordID, string(status))
 
 	}(record.ID, scriptName)
 
 	return nil
+}
+
+func (s *DevOpsService) updateRecordStatus(ctx context.Context, id uint64, status devops.PipelineStatus, output string, startedAt *time.Time) {
+	endTime := time.Now()
+	var duration int64
+	if startedAt != nil {
+		duration = int64(time.Since(*startedAt).Seconds())
+	}
+
+	// Limit output size for DB storage
+	dbOutput := output
+	if len(dbOutput) > 20000 { // Increased limit
+		dbOutput = dbOutput[:20000] + "...(truncated)"
+	}
+
+	updateObj := &devops.PipelineRecord{
+		ID:         id,
+		Status:     status,
+		Duration:   duration,
+		FinishedAt: &endTime,
+		CommitMsg:  dbOutput,
+	}
+
+	_ = s.devopsRepo.SavePipelineRecord(ctx, updateObj)
 }
 
 func nowPtr() *time.Time {
