@@ -51,6 +51,9 @@ func SetupRouter(
 			projects.DELETE("/:id/users/:uid", projectHandler.RemoveProjectUser)
 		}
 
+		// DevOps SSE 路由 (不做认证以支持 EventSource)
+		v1.GET("/devops/events", devopsHandler.StreamLogs)
+
 		// DevOps 路由 (全局)
 		devops := v1.Group("/devops")
 		devops.Use(middleware.Auth())
