@@ -54,13 +54,14 @@ func SetRSAPrivateKey(privateKeyPath string) error {
 
 	// 支持PKCS1和PKCS8格式
 	var key *rsa.PrivateKey
-	if block.Type == "RSA PRIVATE KEY" {
+	switch block.Type {
+	case "RSA PRIVATE KEY":
 		// PKCS1格式
 		key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
 			return fmt.Errorf("failed to parse PKCS1 private key: %w", err)
 		}
-	} else if block.Type == "PRIVATE KEY" {
+	case "PRIVATE KEY":
 		// PKCS8格式
 		parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
@@ -71,7 +72,7 @@ func SetRSAPrivateKey(privateKeyPath string) error {
 		if !ok {
 			return errors.New("not an RSA private key")
 		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported key type: %s", block.Type)
 	}
 
@@ -93,19 +94,20 @@ func SetRSAPublicKey(publicKeyPath string) error {
 	}
 
 	var pub interface{}
-	if block.Type == "PUBLIC KEY" {
+	switch block.Type {
+	case "PUBLIC KEY":
 		// PKIX格式
 		pub, err = x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
 			return fmt.Errorf("failed to parse PKIX public key: %w", err)
 		}
-	} else if block.Type == "RSA PUBLIC KEY" {
+	case "RSA PUBLIC KEY":
 		// PKCS1格式
 		pub, err = x509.ParsePKCS1PublicKey(block.Bytes)
 		if err != nil {
 			return fmt.Errorf("failed to parse PKCS1 public key: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported key type: %s", block.Type)
 	}
 
