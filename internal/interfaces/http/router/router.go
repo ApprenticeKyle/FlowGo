@@ -62,7 +62,7 @@ func SetupRouter(
 
 		// 统计 API
 		stats := v1.Group("/stats")
-		// stats.Use(middleware.Auth()) // 根据需求决定是否需要鉴权，这里暂时公开方便查看，或者加 Auth
+		stats.Use(middleware.Auth())
 		{
 			stats.GET("/visits", statsHandler.GetVisitStats)
 		}
